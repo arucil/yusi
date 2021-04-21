@@ -2,7 +2,11 @@
 
 pub mod grammar;
 pub mod parser;
+mod bnf;
 
-pub fn build(grammar: grammar::Grammar) {
-  println!("Hello, world!");
+pub use parser::Parser;
+pub use grammar::Grammar;
+
+pub fn build(grammar: Grammar) -> Result<Parser, String> {
+  Parser::new(grammar)
 }
