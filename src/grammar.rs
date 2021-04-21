@@ -9,10 +9,10 @@ pub struct Grammar {
 }
 
 #[derive(Debug, Clone)]
-pub struct Rule(RuleInner);
+pub struct Rule(pub(crate) RuleInner);
 
 #[derive(Debug, Clone)]
-enum RuleInner {
+pub(crate) enum RuleInner {
   Sym(String),
   Seq(Vec<RuleInner>),
   Or(Vec<RuleInner>),
@@ -25,21 +25,21 @@ enum RuleInner {
 }
 
 #[derive(Debug, Clone)]
-struct RuleRep {
-  rule: RuleInner,
+pub(crate) struct RuleRep {
+  pub(crate) rule: RuleInner,
 }
 
 #[derive(Debug, Clone)]
-struct RuleSepBy {
-  sep: RuleInner,
-  rule: RuleInner,
+pub(crate) struct RuleSepBy {
+  pub(crate) sep: RuleInner,
+  pub(crate) rule: RuleInner,
 }
 
 #[derive(Debug, Clone)]
-struct RulePrec {
-  prec: u16,
-  assoc: Assoc,
-  rule: RuleInner,
+pub(crate) struct RulePrec {
+  pub(crate) prec: u16,
+  pub(crate) assoc: Assoc,
+  pub(crate) rule: RuleInner,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -235,5 +235,11 @@ impl RuleInner {
         rule.rule.validate(names)
       }
     }
+  }
+}
+
+impl Default for Assoc {
+  fn default() -> Self {
+    Self::None
   }
 }
