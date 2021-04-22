@@ -1,4 +1,4 @@
-#![feature(box_syntax, box_patterns)]
+#![feature(box_syntax, box_patterns, bindings_after_at)]
 
 pub mod grammar;
 pub mod parser;
