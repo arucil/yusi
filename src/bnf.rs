@@ -8,7 +8,7 @@ pub(crate) struct Bnf {
   pub(crate) nonterms: Vec<Nonterm>,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Copy)]
 pub(crate) enum Symbol {
   Term(TermId),
   Nonterm(NontermId),
@@ -29,9 +29,50 @@ pub(crate) struct Nonterm {
 
 #[derive(Clone, Default)]
 pub(crate) struct Production {
+  pub(crate) action: ProdAction,
   pub(crate) prec: Option<u16>,
   pub(crate) assoc: Assoc,
   pub(crate) symbols: Vec<Symbol>,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(crate) enum ProdAction {
+  None,
+  /// `rule*  ->  ε`
+  StartMany,
+  /// `rule*  ->  rule* rule`
+  ContinueMany,
+  /// `rule+  ->  rule`
+  StartSome,
+  /// `rule+  ->  rule+ rule`
+  ContinueSome,
+  /// `rule?  ->  ε`
+  EmptyOption,
+  /// `rule?  ->  rule`
+  NonemptyOption,
+  /// `sepBy(sep, rule)  ->  ε`
+  EmptySepBy,
+  /// `sepBy(sep, rule)  ->  sepBy1(sep, rule)`
+  NonemptySepBy,
+  /// `sepBy1(sep, rule)  ->  rule`
+  StartSepBy1,
+  /// `sepBy1(sep, rule)  ->  sepBy1(sep, rule) sep rule`
+  ContinueSepBy1,
+}
+
+impl Default for ProdAction {
+  fn default() -> Self {
+    Self::None
+  }
+}
+
+impl Symbol {
+  fn unwrap_nonterm(self) -> NontermId {
+    match self {
+      Self::Nonterm(id) => id,
+      _ => panic!("Term"),
+    }
+  }
 }
 
 impl From<Grammar> for Bnf {
@@ -41,20 +82,22 @@ impl From<Grammar> for Bnf {
       .map(|(i, name)| (name, TermId(i as u32)))
       .collect::<HashMap<_, _>>();
 
-    let mut nonterm_names = HashMap::new();
+    let mut symbols = HashMap::new();
     for (i, (name, _)) in grammar.rules.iter().enumerate() {
-      nonterm_names.insert(name.clone(), NontermId(i as u32));
+      symbols.insert(name.clone(), Symbol::Nonterm(NontermId(i as u32)));
+    }
+    for (name, id) in &tokens {
+      symbols.insert(name.clone(), Symbol::Term(*id));
     }
 
     let mut nonterms = vec![Nonterm::default(); grammar.rules.len()];
     for (i, (name, rule)) in grammar.rules.into_iter().enumerate() {
-      let nonterm = gen_nonterm(
-        &mut nonterms, &mut nonterm_names, &tokens, &name, rule);
-      nonterms[i] = nonterm;
+      let id = NontermId(i as u32);
+      gen_nonterm(&mut nonterms, &mut symbols, Some(id), &name, rule.0);
     }
 
     let start = grammar.start.into_iter()
-      .map(|s| (s, nonterm_names[&s]))
+      .map(|s| (s, symbols[&s].unwrap_nonterm()))
       .collect();
 
     Bnf {
@@ -67,35 +110,131 @@ impl From<Grammar> for Bnf {
 
 fn gen_nonterm(
   nonterms: &mut Vec<Nonterm>,
-  nonterm_names: &mut HashMap<String, NontermId>,
-  tokens: &HashMap<String, TermId>,
+  symbols: &mut HashMap<String, Symbol>,
+  id: Option<NontermId>,
   name: impl Into<String>,
   rule: RuleInner,
-) -> Nonterm {
+) -> NontermId {
   match rule {
     RuleInner::Sym(_) | RuleInner::Seq(_) | RuleInner::Prec(_) => {
-      Nonterm {
-        name: name.into(),
-        prods: vec![gen_prod(nonterms, nonterm_names, tokens, rule)],
+      let name = name.into();
+      let nonterm = Nonterm {
+        name: name.clone(),
+        prods: vec![gen_prod(nonterms, symbols, ProdAction::None, rule)],
+      };
+      if let Some(id@NontermId(ix)) = id {
+        nonterms[ix as usize] = nonterm;
+        id
+      } else {
+        let id = NontermId(nonterms.len() as u32);
+        symbols.insert(name.clone(), Symbol::Nonterm(id));
+        nonterms.push(nonterm);
+        id
       }
     }
     RuleInner::Or(rules) => {
-      Nonterm {
-        name: name.into(),
+      let name = name.into();
+      let nonterm = Nonterm {
+        name: name.clone(),
         prods: rules.into_iter()
-          .map(|rule| gen_prod(nonterms, nonterm_names, tokens, rule))
+          .map(|rule| gen_prod(nonterms, symbols, ProdAction::None, rule))
           .collect(),
+      };
+      if let Some(id@NontermId(ix)) = id {
+        nonterms[ix as usize] = nonterm;
+        id
+      } else {
+        let id = NontermId(nonterms.len() as u32);
+        symbols.insert(name.clone(), Symbol::Nonterm(id));
+        nonterms.push(nonterm);
+        id
       }
     }
     RuleInner::Many(box RuleRep { rule }) => {
+      gen_rep_nonterm(nonterms, symbols, id, name, move |id, prods| {
+        // rule* -> ε
+        prods.push(Production {
+          action: ProdAction::StartMany,
+          ..Default::default()
+        });
+
+        // rule* -> rule* rule
+        prods.push(Production {
+          action: ProdAction::ContinueMany,
+          symbols: vec![
+            Symbol::Nonterm(id),
+            gen_sym(nonterms, symbols, rule),
+          ],
+          ..Default::default()
+        });
+      })
+    }
+    RuleInner::Some(box RuleRep { rule }) => {
+      gen_rep_nonterm(nonterms, symbols, id, name, move |id, prods| {
+        let sym = gen_sym(nonterms, symbols, rule);
+
+        // rule+ -> rule
+        prods.push(Production {
+          action: ProdAction::StartSome,
+          symbols: vec![sym],
+          ..Default::default()
+        });
+
+        // rule+ -> rule+ rule
+        prods.push(Production {
+          action: ProdAction::ContinueSome,
+          symbols: vec![
+            Symbol::Nonterm(id),
+            sym,
+          ],
+          ..Default::default()
+        });
+      })
+    }
+    RuleInner::Option(box RuleRep { rule }) => {
+      gen_rep_nonterm(nonterms, symbols, id, name, move |id, prods| {
+        // rule? -> ε
+        prods.push(Production {
+          action: ProdAction::EmptyOption,
+          ..Default::default()
+        });
+
+        // rule? -> rule
+        prods.push(gen_prod(nonterms, symbols, ProdAction::NonemptyOption, rule));
+      })
     }
   }
 }
 
+fn gen_rep_nonterm(
+  nonterms: &mut Vec<Nonterm>,
+  symbols: &mut HashMap<String, Symbol>,
+  id: Option<NontermId>,
+  name: impl Into<String>,
+  f: impl FnOnce(NontermId, &mut Vec<Production>),
+) -> NontermId {
+  let name = name.into();
+  let id = if let Some(id) = id {
+    id
+  } else {
+    let id = NontermId(nonterms.len() as u32);
+    nonterms.push(Nonterm::default());
+    id
+  };
+
+  symbols.insert(name.clone(), Symbol::Nonterm(id));
+
+  let nonterm = &mut nonterms[id.0 as usize];
+  nonterm.name = name;
+  f(id, &mut nonterm.prods);
+
+  id
+}
+
 fn gen_prod(
   nonterms: &mut Vec<Nonterm>,
-  nonterm_names: &mut HashMap<String, NontermId>,
-  tokens: &HashMap<String, TermId>,
+  symbols: &mut HashMap<String, Symbol>,
+  action: ProdAction,
   rule: RuleInner,
 ) -> Production {
   match rule {
@@ -106,17 +245,10 @@ fn gen_prod(
 
 fn gen_sym(
   nonterms: &mut Vec<Nonterm>,
-  nonterm_names: &mut HashMap<String, NontermId>,
-  tokens: &HashMap<String, TermId>,
+  symbols: &mut HashMap<String, Symbol>,
   rule: RuleInner,
 ) -> Symbol {
   match rule {
-    RuleInner::Sym(sym) => {
-      if let Some(&term_id) = tokens.get(&sym) {
-        Symbol::Term(term_id)
-      } else {
-        Symbol::Nonterm(nonterm_names[&sym])
-      }
-    }
+    RuleInner::Sym(sym) => symbols[&sym],
   }
 }
