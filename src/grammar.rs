@@ -236,6 +236,49 @@ impl RuleInner {
       }
     }
   }
+
+  fn name_as_arg(&self) -> String {
+    match self {
+      Self::Sym(_) => format!("({})", self.name()),
+      _ => self.name(),
+    }
+  }
+
+  pub(crate) fn name(&self) -> String {
+    match self {
+      Self::Sym(sym) => sym.clone(),
+      Self::Seq(rules) => {
+        format!("({})", rules.iter()
+          .map(|rule| rule.name())
+          .collect::<Vec<_>>()
+          .join(" "))
+      }
+      Self::Or(rules) => {
+        format!("({})", rules.iter()
+          .map(|rule| rule.name())
+          .collect::<Vec<_>>()
+          .join(" | "))
+      }
+      Self::Many(box RuleRep { rule }) => {
+        format!("{}*", rule.name())
+      }
+      Self::Some(box RuleRep { rule }) => {
+        format!("{}+", rule.name())
+      }
+      Self::Option(box RuleRep { rule }) => {
+        format!("{}?", rule.name())
+      }
+      Self::SepBy(box RuleSepBy { sep, rule }) => {
+        format!("sepBy<{}>{}", sep.name(), rule.name_as_arg())
+      }
+      Self::SepBy1(box RuleSepBy { sep, rule }) => {
+        format!("sepBy1<{}>{}", sep.name(), rule.name_as_arg())
+      }
+      Self::Prec(box RulePrec { prec, assoc, rule }) => {
+        format!("prec<{}, {:?}>{}", prec, assoc, rule.name_as_arg())
+      }
+    }
+  }
 }
 
 impl Default for Assoc {

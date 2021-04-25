@@ -2,32 +2,33 @@ use std::collections::HashMap;
 use indexmap::IndexMap;
 use crate::grammar::*;
 
+#[derive(Debug)]
 pub(crate) struct Bnf {
-  pub(crate) tokens: HashMap<String, TermId>,
+  pub(crate) tokens: IndexMap<String, TermId>,
   pub(crate) start: IndexMap<String, NontermId>,
   pub(crate) nonterms: Vec<Nonterm>,
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub(crate) enum Symbol {
   Term(TermId),
   Nonterm(NontermId),
 }
 
-#[derive(Clone, PartialEq, Eq, Copy)]
+#[derive(Clone, PartialEq, Eq, Copy, Debug)]
 pub(crate) struct TermId(pub(crate) u32);
 
-#[derive(Clone, PartialEq, Eq, Copy)]
+#[derive(Clone, PartialEq, Eq, Copy, Debug)]
 pub(crate) struct NontermId(pub(crate) u32);
 
-#[derive(Clone, Default)]
+#[derive(Clone, Default, Debug)]
 pub(crate) struct Nonterm {
   pub(crate) name: String,
   /// non-empty
   pub(crate) prods: Vec<Production>,
 }
 
-#[derive(Clone, Default)]
+#[derive(Clone, Default, Debug)]
 pub(crate) struct Production {
   pub(crate) action: ProdAction,
   pub(crate) prec: Option<u16>,
@@ -35,7 +36,7 @@ pub(crate) struct Production {
   pub(crate) symbols: Vec<Symbol>,
 }
 
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub(crate) enum ProdAction {
   None,
   /// `rule*  ->  ε`
@@ -80,7 +81,7 @@ impl From<Grammar> for Bnf {
     let tokens = grammar.tokens.into_iter()
       .enumerate()
       .map(|(i, name)| (name, TermId(i as u32)))
-      .collect::<HashMap<_, _>>();
+      .collect::<IndexMap<_, _>>();
 
     let mut symbols = HashMap::new();
     for (i, (name, _)) in grammar.rules.iter().enumerate() {
@@ -310,19 +311,25 @@ fn gen_prod(
   rule: RuleInner,
 ) -> Production {
   match rule {
-    RuleInner::Sym(_) | RuleInner::Or(_) => {
-      Production {
-        action,
-        symbols: vec![gen_sym(nonterms, symbols, rule)],
-        ..Default::default()
-      }
-    }
     RuleInner::Seq(rules) => {
       Production {
         action,
         symbols: rules.into_iter()
           .map(|rule| gen_sym(nonterms, symbols, rule))
           .collect(),
+        ..Default::default()
+      }
+    }
+    RuleInner::Prec(box RulePrec { prec, assoc, rule }) => {
+      let mut prod = gen_prod(nonterms, symbols, action, rule);
+      prod.prec = Some(prec);
+      prod.assoc = assoc;
+      prod
+    }
+    _ => {
+      Production {
+        action,
+        symbols: vec![gen_sym(nonterms, symbols, rule)],
         ..Default::default()
       }
     }
@@ -335,6 +342,62 @@ fn gen_sym(
   rule: RuleInner,
 ) -> Symbol {
   match rule {
-    RuleInner::Sym(sym) => symbols[&sym],
+    RuleInner::Sym(sym) => {
+      if !symbols.contains_key(&sym) {
+        println!("symbols: {:#?}, sym: {}", symbols, sym)
+      }
+      symbols[&sym]
+    },
+    RuleInner::Prec(box RulePrec { prec, assoc, rule }) => {
+      let id = match gen_sym(nonterms, symbols, rule.clone()) {
+        Symbol::Term(_) => {
+          gen_nonterm(nonterms, symbols, None, rule.name(), rule)
+        }
+        Symbol::Nonterm(id) => id,
+      };
+      for prod in &mut nonterms[id.0 as usize].prods {
+        prod.prec = Some(prec);
+        prod.assoc = assoc;
+      }
+      Symbol::Nonterm(id)
+    }
+    _ => {
+      let name = rule.name();
+      Symbol::Nonterm(gen_nonterm(nonterms, symbols, None, name, rule))
+    }
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use insta::assert_debug_snapshot;
+  use super::*;
+
+  #[test]
+  fn expr() {
+    let gram = grammar(
+      &["+", "-", "*", "/", "num", "(", ")", "id", ","],
+      &["expr"],
+    &[
+      (
+        "expr",
+        prec(0, Assoc::Left, seq([sym("expr"), sym("+") | sym("-"), sym("expr")]))
+        | prec(1, Assoc::Left, seq([sym("expr"), sym("*") | sym("/"), sym("expr")]))
+        | prec(2, Assoc::None, seq([sym("-"), sym("expr")]))
+        | seq([sym("("), sym("expr"), sym(")")])
+        | sym("id")
+        | sym("num")
+        | sym("call")
+      ),
+      (
+        "call",
+        seq([sym("id"), sym("("), sep_by(sym(","), sym("expr")), sym(")")])
+      )
+    ]).unwrap();
+
+    gram.validate().unwrap();
+    let bnf: Bnf = gram.into();
+
+    assert_debug_snapshot!(bnf);
   }
 }

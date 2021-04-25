@@ -8,3 +8,6 @@ edition = "2018"
 
 [dependencies]
 indexmap = "1.6.2"
+
+[dev-dependencies]
+insta = "1.5.3"
