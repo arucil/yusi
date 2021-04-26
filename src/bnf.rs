@@ -44,9 +44,9 @@ pub(crate) enum ProdAction {
   /// `rule*  ->  rule* rule`
   ContinueMany,
   /// `rule+  ->  rule`
-  StartSome,
+  StartMany1,
   /// `rule+  ->  rule+ rule`
-  ContinueSome,
+  ContinueMany1,
   /// `rule?  ->  ε`
   EmptyOption,
   /// `rule?  ->  rule`
@@ -160,21 +160,21 @@ fn gen_nonterm(
         });
       })
     }
-    RuleInner::Some(box RuleRep { rule }) => {
+    RuleInner::Many1(box RuleRep { rule }) => {
       gen_rep_nonterm(nonterms, symbols, id, name, |nonterms, symbols, id| {
         let sym = gen_sym(nonterms, symbols, rule);
         let prods = &mut nonterms[id.0 as usize].prods;
 
         // rule+ -> rule
         prods.push(Production {
-          action: ProdAction::StartSome,
+          action: ProdAction::StartMany1,
           symbols: vec![sym],
           ..Default::default()
         });
 
         // rule+ -> rule+ rule
         prods.push(Production {
-          action: ProdAction::ContinueSome,
+          action: ProdAction::ContinueMany1,
           symbols: vec![
             Symbol::Nonterm(id),
             sym,
@@ -393,6 +393,35 @@ mod tests {
         "call",
         seq([sym("id"), sym("("), sep_by(sym(","), sym("expr")), sym(")")])
       )
+    ]).unwrap();
+
+    gram.validate().unwrap();
+    let bnf: Bnf = gram.into();
+
+    assert_debug_snapshot!(bnf);
+  }
+
+  #[test]
+  fn repetition() {
+    let gram = grammar(
+      &["a", "b", "c", "d"],
+      &["A", "B"],
+    &[
+      (
+        "A",
+        seq([
+          many(seq([sym("a"), option(sym("C")), sym("B") | sym("b")])),
+          option(seq([sym("A"), sym("a")]))
+        ])
+      ),
+      (
+        "B",
+        many1(sym("c") | seq([sym("d"), sym("B")]))
+      ),
+      (
+        "C",
+        sym("B") | sym("b")
+      ),
     ]).unwrap();
 
     gram.validate().unwrap();

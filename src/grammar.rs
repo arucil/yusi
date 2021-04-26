@@ -17,7 +17,7 @@ pub(crate) enum RuleInner {
   Seq(Vec<RuleInner>),
   Or(Vec<RuleInner>),
   Many(Box<RuleRep>),
-  Some(Box<RuleRep>),
+  Many1(Box<RuleRep>),
   Option(Box<RuleRep>),
   SepBy(Box<RuleSepBy>),
   SepBy1(Box<RuleSepBy>),
@@ -69,10 +69,10 @@ pub fn many(
   }))
 }
 
-pub fn some(
+pub fn many1(
   rule: Rule,
 ) -> Rule {
-  Rule(RuleInner::Some(box RuleRep {
+  Rule(RuleInner::Many1(box RuleRep {
     rule: rule.0,
   }))
 }
@@ -224,7 +224,7 @@ impl RuleInner {
         }
         Ok(())
       }
-      Self::Many(rule) | Self::Some(rule) | Self::Option(rule) => {
+      Self::Many(rule) | Self::Many1(rule) | Self::Option(rule) => {
         rule.rule.validate(names)
       }
       Self::SepBy(rule) | Self::SepBy1(rule) => {
@@ -262,7 +262,7 @@ impl RuleInner {
       Self::Many(box RuleRep { rule }) => {
         format!("{}*", rule.name())
       }
-      Self::Some(box RuleRep { rule }) => {
+      Self::Many1(box RuleRep { rule }) => {
         format!("{}+", rule.name())
       }
       Self::Option(box RuleRep { rule }) => {

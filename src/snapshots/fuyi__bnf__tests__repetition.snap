@@ -1,0 +1,285 @@
+---
+source: src/bnf.rs
+expression: bnf
+
+---
+Bnf {
+    tokens: {
+        "a": TermId(
+            0,
+        ),
+        "b": TermId(
+            1,
+        ),
+        "c": TermId(
+            2,
+        ),
+        "d": TermId(
+            3,
+        ),
+    },
+    start: {
+        "A": NontermId(
+            0,
+        ),
+        "B": NontermId(
+            1,
+        ),
+    },
+    nonterms: [
+        Nonterm {
+            name: "A",
+            prods: [
+                Production {
+                    action: None,
+                    prec: None,
+                    assoc: None,
+                    symbols: [
+                        Nonterm(
+                            NontermId(
+                                3,
+                            ),
+                        ),
+                        Nonterm(
+                            NontermId(
+                                7,
+                            ),
+                        ),
+                    ],
+                },
+            ],
+        },
+        Nonterm {
+            name: "B",
+            prods: [
+                Production {
+                    action: StartMany1,
+                    prec: None,
+                    assoc: None,
+                    symbols: [
+                        Nonterm(
+                            NontermId(
+                                8,
+                            ),
+                        ),
+                    ],
+                },
+                Production {
+                    action: ContinueMany1,
+                    prec: None,
+                    assoc: None,
+                    symbols: [
+                        Nonterm(
+                            NontermId(
+                                1,
+                            ),
+                        ),
+                        Nonterm(
+                            NontermId(
+                                8,
+                            ),
+                        ),
+                    ],
+                },
+            ],
+        },
+        Nonterm {
+            name: "C",
+            prods: [
+                Production {
+                    action: None,
+                    prec: None,
+                    assoc: None,
+                    symbols: [
+                        Nonterm(
+                            NontermId(
+                                1,
+                            ),
+                        ),
+                    ],
+                },
+                Production {
+                    action: None,
+                    prec: None,
+                    assoc: None,
+                    symbols: [
+                        Term(
+                            TermId(
+                                1,
+                            ),
+                        ),
+                    ],
+                },
+            ],
+        },
+        Nonterm {
+            name: "(a C? (B | b))*",
+            prods: [
+                Production {
+                    action: StartMany,
+                    prec: None,
+                    assoc: None,
+                    symbols: [],
+                },
+                Production {
+                    action: ContinueMany,
+                    prec: None,
+                    assoc: None,
+                    symbols: [
+                        Nonterm(
+                            NontermId(
+                                3,
+                            ),
+                        ),
+                        Nonterm(
+                            NontermId(
+                                6,
+                            ),
+                        ),
+                    ],
+                },
+            ],
+        },
+        Nonterm {
+            name: "C?",
+            prods: [
+                Production {
+                    action: EmptyOption,
+                    prec: None,
+                    assoc: None,
+                    symbols: [],
+                },
+                Production {
+                    action: NonemptyOption,
+                    prec: None,
+                    assoc: None,
+                    symbols: [
+                        Nonterm(
+                            NontermId(
+                                2,
+                            ),
+                        ),
+                    ],
+                },
+            ],
+        },
+        Nonterm {
+            name: "(B | b)",
+            prods: [
+                Production {
+                    action: None,
+                    prec: None,
+                    assoc: None,
+                    symbols: [
+                        Nonterm(
+                            NontermId(
+                                1,
+                            ),
+                        ),
+                    ],
+                },
+                Production {
+                    action: None,
+                    prec: None,
+                    assoc: None,
+                    symbols: [
+                        Term(
+                            TermId(
+                                1,
+                            ),
+                        ),
+                    ],
+                },
+            ],
+        },
+        Nonterm {
+            name: "(a C? (B | b))",
+            prods: [
+                Production {
+                    action: None,
+                    prec: None,
+                    assoc: None,
+                    symbols: [
+                        Term(
+                            TermId(
+                                0,
+                            ),
+                        ),
+                        Nonterm(
+                            NontermId(
+                                4,
+                            ),
+                        ),
+                        Nonterm(
+                            NontermId(
+                                5,
+                            ),
+                        ),
+                    ],
+                },
+            ],
+        },
+        Nonterm {
+            name: "(A a)?",
+            prods: [
+                Production {
+                    action: EmptyOption,
+                    prec: None,
+                    assoc: None,
+                    symbols: [],
+                },
+                Production {
+                    action: NonemptyOption,
+                    prec: None,
+                    assoc: None,
+                    symbols: [
+                        Nonterm(
+                            NontermId(
+                                0,
+                            ),
+                        ),
+                        Term(
+                            TermId(
+                                0,
+                            ),
+                        ),
+                    ],
+                },
+            ],
+        },
+        Nonterm {
+            name: "(c | (d B))",
+            prods: [
+                Production {
+                    action: None,
+                    prec: None,
+                    assoc: None,
+                    symbols: [
+                        Term(
+                            TermId(
+                                2,
+                            ),
+                        ),
+                    ],
+                },
+                Production {
+                    action: None,
+                    prec: None,
+                    assoc: None,
+                    symbols: [
+                        Term(
+                            TermId(
+                                3,
+                            ),
+                        ),
+                        Nonterm(
+                            NontermId(
+                                1,
+                            ),
+                        ),
+                    ],
+                },
+            ],
+        },
+    ],
+}
