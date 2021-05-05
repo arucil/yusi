@@ -18,7 +18,7 @@ pub(crate) enum Symbol {
 #[derive(Clone, PartialEq, Eq, Copy, Debug)]
 pub(crate) struct TermId(pub(crate) u32);
 
-#[derive(Clone, PartialEq, Eq, Copy, Debug)]
+#[derive(Clone, PartialEq, Eq, Copy, Debug, Hash)]
 pub(crate) struct NontermId(pub(crate) u32);
 
 #[derive(Clone, Default, Debug)]
