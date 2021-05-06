@@ -11,3 +11,4 @@ indexmap = "1.6.2"
 
 [dev-dependencies]
 insta = "1.5.3"
+pretty_assertions = "0.6.1"

@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use crate::bnf::*;
 use indexmap::IndexMap;
-use super::token_set::TokenSet;
+use super::bitset::BitSet;
 
 pub(super) struct States {
   pub(super) states: IndexMap<StateKey, State>,
@@ -17,7 +17,7 @@ pub(crate) struct Lr0Item {
 pub(crate) struct Lalr1Item {
   pub(crate) nonterm: NontermId,
   pub(crate) prod_ix: u16,
-  pub(crate) lookaheads: TokenSet,
+  pub(crate) lookaheads: BitSet,
 }
 
 pub(crate) struct State {
@@ -53,4 +53,5 @@ fn gen_states_for_start(
   states: &mut IndexMap<StateKey, State>,
   start: NontermId,
 ) -> u32 {
+  todo!()
 }

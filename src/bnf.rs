@@ -76,6 +76,29 @@ impl Symbol {
   }
 }
 
+impl Bnf {
+  fn augment(&mut self) {
+    let mut ix = self.nonterms.len() as u32;
+    for (name, id) in &mut self.start {
+      self.nonterms.push(Nonterm {
+        name: format!("$start({})", name),
+        prods: vec![
+          Production {
+            action: ProdAction::None,
+            prec: None,
+            assoc: Assoc::None,
+            symbols: vec![Symbol::Nonterm(*id)],
+          }
+        ]
+      });
+
+      let new_id = NontermId(ix);
+      ix += 1;
+      *id = new_id;
+    }
+  }
+}
+
 impl From<Grammar> for Bnf {
   fn from(grammar: Grammar) -> Bnf {
     let tokens = grammar.tokens.into_iter()
@@ -406,23 +429,23 @@ mod tests {
     let gram = grammar(
       &["a", "b", "c", "d"],
       &["A", "B"],
-    &[
-      (
-        "A",
-        seq([
-          many(seq([sym("a"), option(sym("C")), sym("B") | sym("b")])),
-          option(seq([sym("A"), sym("a")]))
-        ])
-      ),
-      (
-        "B",
-        many1(sym("c") | seq([sym("d"), sym("B")]))
-      ),
-      (
-        "C",
-        sym("B") | sym("b")
-      ),
-    ]).unwrap();
+      &[
+        (
+          "A",
+          seq([
+            many(seq([sym("a"), option(sym("C")), sym("B") | sym("b")])),
+            option(seq([sym("A"), sym("a")]))
+          ])
+        ),
+        (
+          "B",
+          many1(sym("c") | seq([sym("d"), sym("B")]))
+        ),
+        (
+          "C",
+          sym("B") | sym("b")
+        ),
+      ]).unwrap();
 
     gram.validate().unwrap();
     let bnf: Bnf = gram.into();

@@ -1,7 +1,7 @@
 use crate::grammar::Grammar;
 
 mod state;
-mod token_set;
+mod bitset;
 mod sets;
 
 pub struct Parser {

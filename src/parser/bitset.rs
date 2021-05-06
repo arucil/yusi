@@ -5,21 +5,21 @@ type BitBlock = u64;
 const BLOCK_NBITS: usize = std::mem::size_of::<BitBlock>() * 8;
 
 #[derive(Clone, PartialEq, Eq, Hash)]
-pub struct TokenSet {
+pub struct BitSet {
   slice: Box<[BitBlock]>,
 }
 
-impl TokenSet {
-  pub fn new(num_tokens: usize) -> Self {
-    let len = (num_tokens + BLOCK_NBITS - 1) / BLOCK_NBITS;
+impl BitSet {
+  pub fn new(num_bits: usize) -> Self {
+    let len = (num_bits + BLOCK_NBITS - 1) / BLOCK_NBITS;
     Self {
       slice: vec![0; len].into_boxed_slice(),
     }
   }
 
-  pub fn from_token(num_tokens: usize, token: u32) -> Self {
-    let mut s = Self::new(num_tokens);
-    s.insert(token);
+  pub fn from_bit(num_bits: usize, bit: usize) -> Self {
+    let mut s = Self::new(num_bits);
+    s.insert(bit);
     s
   }
 
@@ -29,13 +29,13 @@ impl TokenSet {
     }
   }
 
-  pub fn insert(&mut self, token: u32) {
-    self.slice[token as usize / BLOCK_NBITS] |=
-      1 << (token as u64 % BLOCK_NBITS as u64);
+  pub fn insert(&mut self, bit: usize) {
+    self.slice[bit / BLOCK_NBITS] |=
+      1 << (bit as u64 % BLOCK_NBITS as u64);
   }
 
   /// Returns whether the set has changed.
-  pub fn union_with(&mut self, other: &TokenSet) -> bool {
+  pub fn union_with(&mut self, other: &BitSet) -> bool {
     let mut changed = false;
     for i in 0..self.slice.len() {
       let old = self.slice[i];
@@ -52,6 +52,10 @@ impl TokenSet {
       index: 0,
     }
   }
+
+  pub fn get(&self, bit: usize) -> bool {
+    self.slice[bit / BLOCK_NBITS] & (bit as u64 % BLOCK_NBITS as u64) != 0
+  }
 }
 
 pub struct Iter<'a> {
@@ -61,16 +65,16 @@ pub struct Iter<'a> {
 }
 
 impl<'a> Iterator for Iter<'a> {
-  type Item = u32;
+  type Item = usize;
 
-  fn next(&mut self) -> Option<u32> {
+  fn next(&mut self) -> Option<usize> {
     while self.index < self.slice.len() {
       if self.bit < BLOCK_NBITS {
         let bit = (self.slice[self.index] & !((1 << self.bit) - 1))
           .trailing_zeros() as usize;
         if bit < BLOCK_NBITS {
           self.bit = bit + 1;
-          return Some((self.index * BLOCK_NBITS + bit) as u32);
+          return Some(self.index * BLOCK_NBITS + bit);
         }
       }
 
@@ -81,7 +85,7 @@ impl<'a> Iterator for Iter<'a> {
   }
 }
 
-impl Debug for TokenSet {
+impl Debug for BitSet {
   fn fmt(&self, f: &mut Formatter) -> fmt::Result {
     f.debug_set().entries(self.iter()).finish()
   }
@@ -89,12 +93,12 @@ impl Debug for TokenSet {
 
 #[cfg(test)]
 mod tests {
-  use super::TokenSet;
+  use super::BitSet;
   use pretty_assertions::assert_eq;
 
   #[test]
   fn insert() {
-    let mut set = TokenSet::new(15);
+    let mut set = BitSet::new(15);
 
     set.insert(7);
     set.insert(3);
