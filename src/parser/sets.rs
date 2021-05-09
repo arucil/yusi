@@ -1,18 +1,18 @@
 use crate::bnf::*;
+use super::bitset::BitSet;
 
 pub(super) fn gen_nullable(
   bnf: &Bnf,
 ) -> Vec<bool> {
   let mut nullable = vec![false; bnf.nonterms.len()];
-  let mut changed = false;
 
   loop {
-    for (i, nonterm) in bnf.nonterms.iter().enumerate() {
-      for prod in &nonterm.prods {
-        if prod.symbols.iter().all(|sym| is_nullable(&nullable, sym)) {
-          changed |= nullable[i];
-          nullable[i] = true;
-        }
+    let mut changed = false;
+    for prod in &bnf.prods {
+      if prod.symbols.iter().all(|sym| is_nullable(&nullable, sym)) {
+        let nt_ix = prod.nonterm_id.0 as usize;
+        changed |= nullable[nt_ix];
+        nullable[nt_ix] = true;
       }
     }
     if !changed {
@@ -30,77 +30,70 @@ fn is_nullable(nullable: &[bool], sym: &Symbol) -> bool {
   }
 }
 
+pub(super) fn gen_first(
+  bnf: &Bnf,
+  nullable: &[bool],
+) -> Vec<BitSet> {
+  let mut buf = BitSet::new(bnf.tokens.len());
+  let mut first = vec![buf.clone(); bnf.nonterms.len()];
+
+  loop {
+    let mut changed = false;
+    for prod in &bnf.prods {
+      buf.clear();
+      compute_first_for_symbols(&mut buf, &first, nullable, &prod.symbols,
+        None);
+      changed |= first[prod.nonterm_id.0 as usize].union_with(&buf);
+    }
+    if !changed {
+      break;
+    }
+  }
+
+  first
+}
+
+pub(super) fn compute_first_for_symbols(
+  result: &mut BitSet,
+  first: &[BitSet],
+  nullable: &[bool],
+  symbols: &[Symbol],
+  lookaheads: Option<&BitSet>,
+) {
+  for sym in symbols {
+    match sym {
+      Symbol::Term(id) => {
+        result.insert(id.0 as usize);
+        return;
+      }
+      Symbol::Nonterm(id) => {
+        result.union_with(&first[id.0 as usize]);
+        if !nullable[id.0 as usize] {
+          return;
+        }
+      }
+    }
+  }
+
+  if let Some(lookaheads) = lookaheads {
+    result.union_with(lookaheads);
+  }
+}
+
 #[cfg(test)]
 mod tests {
   use super::*;
   use pretty_assertions::assert_eq;
-  use indexmap::indexmap;
 
-  /// ```bnf
-  /// Z -> d | X Y Z
-  /// Y -> ε | c
-  /// X -> Y | a
-  /// ```
   fn simple() -> Bnf {
-    Bnf {
-      tokens: indexmap! {
-        "a".to_owned() => TermId(0),
-        "c".to_owned() => TermId(1),
-        "d".to_owned() => TermId(2),
-      },
-      start: indexmap! {
-        "Z".to_owned() => NontermId(0),
-        "Y".to_owned() => NontermId(1),
-        "X".to_owned() => NontermId(2),
-      },
-      nonterms: vec![
-        Nonterm {
-          name: "Z".to_owned(),
-          prods: vec![
-            Production {
-              symbols: vec![Symbol::Term(TermId(2))],
-              ..Default::default()
-            },
-            Production {
-              symbols: vec![
-                Symbol::Nonterm(NontermId(2)),
-                Symbol::Nonterm(NontermId(1)),
-                Symbol::Nonterm(NontermId(0)),
-              ],
-              ..Default::default()
-            },
-          ]
-        },
-        Nonterm {
-          name: "Y".to_owned(),
-          prods: vec![
-            Production {
-              symbols: vec![],
-              ..Default::default()
-            },
-            Production {
-              symbols: vec![
-                Symbol::Term(TermId(1)),
-              ],
-              ..Default::default()
-            },
-          ]
-        },
-        Nonterm {
-          name: "X".to_owned(),
-          prods: vec![
-            Production {
-              symbols: vec![Symbol::Nonterm(NontermId(1))],
-              ..Default::default()
-            },
-            Production {
-              symbols: vec![ Symbol::Term(TermId(0)) ],
-              ..Default::default()
-            },
-          ]
-        }
-      ]
-    }
+    Bnf::parse(r#"
+      Z -> d
+      Z -> X Y Z
+      Y ->
+      Y -> c
+      X -> Y
+      X -> a
+    "#)
   }
 
   #[test]

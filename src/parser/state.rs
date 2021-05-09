@@ -36,7 +36,7 @@ pub(super) fn gen_states(
   let mut states = IndexMap::new();
   let mut starts = HashMap::new();
 
-  for &start in bnf.start.values() {
+  for &start in bnf.starts.values() {
     let start_state = gen_states_for_start(bnf, &mut states, start);
     starts.insert(start, start_state);
   }

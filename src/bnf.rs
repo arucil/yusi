@@ -1,12 +1,14 @@
 use std::collections::HashMap;
+use std::ops::Range;
 use indexmap::IndexMap;
 use crate::grammar::*;
 
 #[derive(Debug)]
 pub(crate) struct Bnf {
   pub(crate) tokens: IndexMap<String, TermId>,
-  pub(crate) start: IndexMap<String, NontermId>,
+  pub(crate) starts: IndexMap<String, NontermId>,
   pub(crate) nonterms: Vec<Nonterm>,
+  pub(crate) prods: Vec<Production>,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -18,18 +20,19 @@ pub(crate) enum Symbol {
 #[derive(Clone, PartialEq, Eq, Copy, Debug)]
 pub(crate) struct TermId(pub(crate) u32);
 
-#[derive(Clone, PartialEq, Eq, Copy, Debug, Hash)]
+#[derive(Clone, PartialEq, Eq, Copy, Debug, Hash, Default)]
 pub(crate) struct NontermId(pub(crate) u32);
 
 #[derive(Clone, Default, Debug)]
 pub(crate) struct Nonterm {
   pub(crate) name: String,
   /// non-empty
-  pub(crate) prods: Vec<Production>,
+  pub(crate) prod_range: Range<usize>,
 }
 
 #[derive(Clone, Default, Debug)]
 pub(crate) struct Production {
+  pub(crate) nonterm_id: NontermId,
   pub(crate) action: ProdAction,
   pub(crate) prec: Option<u16>,
   pub(crate) assoc: Assoc,
@@ -77,25 +80,83 @@ impl Symbol {
 }
 
 impl Bnf {
-  fn augment(&mut self) {
-    let mut ix = self.nonterms.len() as u32;
-    for (name, id) in &mut self.start {
+  pub(crate) fn augment(&mut self) {
+    for (name, id) in &mut self.starts {
+      let new_id = NontermId(self.nonterms.len() as u32);
       self.nonterms.push(Nonterm {
         name: format!("$start({})", name),
-        prods: vec![
-          Production {
-            action: ProdAction::None,
-            prec: None,
-            assoc: Assoc::None,
-            symbols: vec![Symbol::Nonterm(*id)],
-          }
-        ]
+        prod_range: self.prods.len() .. self.prods.len() + 1,
+      });
+      self.prods.push(Production {
+        nonterm_id: new_id,
+        symbols: vec![Symbol::Nonterm(*id)],
+        ..Default::default()
       });
 
-      let new_id = NontermId(ix);
-      ix += 1;
       *id = new_id;
     }
+  }
+
+  #[cfg(test)]
+  pub(crate) fn parse(input: &str) -> Self {
+    let mut start_nts = indexmap::IndexSet::new();
+    let rules = input.trim().lines()
+      .map(|line| {
+        let line = line.split("->").collect::<Vec<_>>();
+        (line[0].trim(), line[1].trim())
+      })
+      .map(|(mut lhs, rhs)| {
+        if lhs.ends_with("*") {
+          lhs = &lhs[..lhs.len() - 1];
+          start_nts.insert(lhs);
+        }
+        let symbols = rhs.split_ascii_whitespace()
+          .map(|sym| sym.trim())
+          .collect::<Vec<_>>();
+        (lhs, symbols)
+      })
+      .fold(IndexMap::<_, Vec<_>>::new(), |mut rules, (lhs, rhs)| {
+        rules.entry(lhs).or_default().push(rhs);
+        rules
+      });
+
+    let mut starts = start_nts.into_iter()
+      .map(|nt|
+        (nt.to_owned(), NontermId(rules.get_index_of(nt).unwrap() as u32)))
+      .collect();
+
+    let mut tokens = IndexMap::<String, TermId>::new();
+    let mut nonterms: Vec<Nonterm> = vec![];
+    let mut prods: Vec<Production> = vec![];
+
+    for (nt, rule) in &rules {
+      let nonterm_id = NontermId(nonterms.len() as u32);
+      nonterms.push(Nonterm {
+        name: (*nt).to_owned(),
+        prod_range: prods.len() .. prods.len() + prods.len(),
+      });
+      for symbols in rule {
+        prods.push(Production {
+          nonterm_id,
+          symbols: symbols.iter()
+            .map(|sym| {
+              if let Some(ix) = rules.get_index_of(sym) {
+                Symbol::Nonterm(NontermId(ix as u32))
+              } else if let Some(id) = tokens.get(*sym) {
+                Symbol::Term(*id)
+              } else {
+                let id = TermId(tokens.len() as u32);
+                tokens.insert((*sym).to_owned(), id);
+                Symbol::Term(id)
+              }
+            })
+            .collect(),
+          ..Default::default()
+        });
+      }
+    }
+
+    Bnf { tokens, starts, nonterms, prods }
   }
 }
 
@@ -115,12 +176,12 @@ impl From<Grammar> for Bnf {
     }
 
     let mut nonterms = vec![Nonterm::default(); grammar.rules.len()];
-    for (i, (name, rule)) in grammar.rules.into_iter().enumerate() {
-      let id = NontermId(i as u32);
-      gen_nonterm(&mut nonterms, &mut symbols, Some(id), &name, rule.0);
+    let mut prods = vec![];
+    for (name, rule) in grammar.rules {
+      gen_nonterm(&mut nonterms, &mut prods, &mut symbols, &name, rule.0);
     }
 
-    let start = grammar.start.into_iter()
+    let starts = grammar.start.into_iter()
       .map(|s| {
         let id = symbols[&s].unwrap_nonterm();
         (s, id)
@@ -129,37 +190,44 @@ impl From<Grammar> for Bnf {
 
     Bnf {
       tokens,
-      start,
+      starts,
       nonterms,
+      prods,
     }
   }
 }
 
 fn gen_nonterm(
   nonterms: &mut Vec<Nonterm>,
+  prods: &mut Vec<Production>,
   symbols: &mut HashMap<String, Symbol>,
-  id: Option<NontermId>,
   name: impl Into<String>,
   rule: RuleInner,
 ) -> NontermId {
   match rule {
     RuleInner::Sym(_) | RuleInner::Seq(_) => {
       let name = name.into();
+      let prod = gen_prod(nonterms, prods, symbols, ProdAction::None, rule);
+      let prod_ix = prods.len();
+      prods.push(prod);
       let nonterm = Nonterm {
         name: name.clone(),
-        prods: vec![gen_prod(nonterms, symbols, ProdAction::None, rule)],
+        prod_range: prod_ix..prod_ix + 1,
       };
-      insert_nonterm(nonterms, symbols, id, name, nonterm)
+      insert_nonterm(nonterms, symbols, name, nonterm)
     }
     RuleInner::Or(rules) => {
       let name = name.into();
+      let rule_prods = rules.into_iter()
+        .map(|rule| gen_prod(nonterms, prods, symbols, ProdAction::None, rule))
+        .collect::<Vec<_>>();
+      let prod_range = prods.len()..prods.len() + rule_prods.len();
+      prods.append(&mut rule_prods);
       let nonterm = Nonterm {
         name: name.clone(),
-        prods: rules.into_iter()
-          .map(|rule| gen_prod(nonterms, symbols, ProdAction::None, rule))
-          .collect(),
+        prod_range,
       };
-      insert_nonterm(nonterms, symbols, id, name, nonterm)
+      insert_nonterm(nonterms, symbols, name, nonterm)
     }
     RuleInner::Many(box RuleRep { rule }) => {
       gen_rep_nonterm(nonterms, symbols, id, name, |nonterms, symbols, id| {
@@ -240,7 +308,7 @@ fn gen_nonterm(
             }))
         ],
       };
-      insert_nonterm(nonterms, symbols, id, name, nonterm)
+      insert_nonterm(nonterms, symbols, name, nonterm)
     }
     RuleInner::SepBy1(box RuleSepBy { sep, rule }) => {
       gen_rep_nonterm(nonterms, symbols, id, name, |nonterms, symbols, id| {
@@ -281,13 +349,12 @@ fn gen_nonterm(
 fn insert_nonterm(
   nonterms: &mut Vec<Nonterm>,
   symbols: &mut HashMap<String, Symbol>,
-  id: Option<NontermId>,
   name: String,
   nonterm: Nonterm,
 ) -> NontermId {
-  if let Some(id@NontermId(ix)) = id {
-    nonterms[ix as usize] = nonterm;
-    id
+  if let Some(Symbol::Nonterm(id)) = symbols.get(&name) {
+    nonterms[id.0 as usize] = nonterm;
+    *id
   } else {
     let id = NontermId(nonterms.len() as u32);
     symbols.insert(name, Symbol::Nonterm(id));
@@ -299,7 +366,6 @@ fn insert_nonterm(
 fn gen_rep_nonterm<F>(
   nonterms: &mut Vec<Nonterm>,
   symbols: &mut HashMap<String, Symbol>,
-  id: Option<NontermId>,
   name: impl Into<String>,
   f: F,
 ) -> NontermId
@@ -329,6 +395,7 @@ where
 
 fn gen_prod(
   nonterms: &mut Vec<Nonterm>,
+  prods: &mut Vec<Production>,
   symbols: &mut HashMap<String, Symbol>,
   action: ProdAction,
   rule: RuleInner,
