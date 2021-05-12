@@ -18,7 +18,7 @@ Bnf {
             3,
         ),
     },
-    start: {
+    starts: {
         "A": NontermId(
             0,
         ),
@@ -29,256 +29,297 @@ Bnf {
     nonterms: [
         Nonterm {
             name: "A",
-            prods: [
-                Production {
-                    action: None,
-                    prec: None,
-                    assoc: None,
-                    symbols: [
-                        Nonterm(
-                            NontermId(
-                                3,
-                            ),
-                        ),
-                        Nonterm(
-                            NontermId(
-                                7,
-                            ),
-                        ),
-                    ],
-                },
-            ],
+            prod_range: 9..10,
         },
         Nonterm {
             name: "B",
-            prods: [
-                Production {
-                    action: StartMany1,
-                    prec: None,
-                    assoc: None,
-                    symbols: [
-                        Nonterm(
-                            NontermId(
-                                8,
-                            ),
-                        ),
-                    ],
-                },
-                Production {
-                    action: ContinueMany1,
-                    prec: None,
-                    assoc: None,
-                    symbols: [
-                        Nonterm(
-                            NontermId(
-                                1,
-                            ),
-                        ),
-                        Nonterm(
-                            NontermId(
-                                8,
-                            ),
-                        ),
-                    ],
-                },
-            ],
+            prod_range: 12..14,
         },
         Nonterm {
             name: "C",
-            prods: [
-                Production {
-                    action: None,
-                    prec: None,
-                    assoc: None,
-                    symbols: [
-                        Nonterm(
-                            NontermId(
-                                1,
-                            ),
-                        ),
-                    ],
-                },
-                Production {
-                    action: None,
-                    prec: None,
-                    assoc: None,
-                    symbols: [
-                        Term(
-                            TermId(
-                                1,
-                            ),
-                        ),
-                    ],
-                },
-            ],
+            prod_range: 14..16,
         },
         Nonterm {
             name: "(a C? (B | b))*",
-            prods: [
-                Production {
-                    action: StartMany,
-                    prec: None,
-                    assoc: None,
-                    symbols: [],
-                },
-                Production {
-                    action: ContinueMany,
-                    prec: None,
-                    assoc: None,
-                    symbols: [
-                        Nonterm(
-                            NontermId(
-                                3,
-                            ),
-                        ),
-                        Nonterm(
-                            NontermId(
-                                6,
-                            ),
-                        ),
-                    ],
-                },
-            ],
+            prod_range: 5..7,
         },
         Nonterm {
             name: "C?",
-            prods: [
-                Production {
-                    action: EmptyOption,
-                    prec: None,
-                    assoc: None,
-                    symbols: [],
-                },
-                Production {
-                    action: NonemptyOption,
-                    prec: None,
-                    assoc: None,
-                    symbols: [
-                        Nonterm(
-                            NontermId(
-                                2,
-                            ),
-                        ),
-                    ],
-                },
-            ],
+            prod_range: 0..2,
         },
         Nonterm {
             name: "(B | b)",
-            prods: [
-                Production {
-                    action: None,
-                    prec: None,
-                    assoc: None,
-                    symbols: [
-                        Nonterm(
-                            NontermId(
-                                1,
-                            ),
-                        ),
-                    ],
-                },
-                Production {
-                    action: None,
-                    prec: None,
-                    assoc: None,
-                    symbols: [
-                        Term(
-                            TermId(
-                                1,
-                            ),
-                        ),
-                    ],
-                },
-            ],
+            prod_range: 2..4,
         },
         Nonterm {
             name: "(a C? (B | b))",
-            prods: [
-                Production {
-                    action: None,
-                    prec: None,
-                    assoc: None,
-                    symbols: [
-                        Term(
-                            TermId(
-                                0,
-                            ),
-                        ),
-                        Nonterm(
-                            NontermId(
-                                4,
-                            ),
-                        ),
-                        Nonterm(
-                            NontermId(
-                                5,
-                            ),
-                        ),
-                    ],
-                },
-            ],
+            prod_range: 4..5,
         },
         Nonterm {
             name: "(A a)?",
-            prods: [
-                Production {
-                    action: EmptyOption,
-                    prec: None,
-                    assoc: None,
-                    symbols: [],
-                },
-                Production {
-                    action: NonemptyOption,
-                    prec: None,
-                    assoc: None,
-                    symbols: [
-                        Nonterm(
-                            NontermId(
-                                0,
-                            ),
-                        ),
-                        Term(
-                            TermId(
-                                0,
-                            ),
-                        ),
-                    ],
-                },
-            ],
+            prod_range: 7..9,
         },
         Nonterm {
             name: "(c | (d B))",
-            prods: [
-                Production {
-                    action: None,
-                    prec: None,
-                    assoc: None,
-                    symbols: [
-                        Term(
-                            TermId(
-                                2,
-                            ),
-                        ),
-                    ],
-                },
-                Production {
-                    action: None,
-                    prec: None,
-                    assoc: None,
-                    symbols: [
-                        Term(
-                            TermId(
-                                3,
-                            ),
-                        ),
-                        Nonterm(
-                            NontermId(
-                                1,
-                            ),
-                        ),
-                    ],
-                },
+            prod_range: 10..12,
+        },
+    ],
+    prods: [
+        Production {
+            nonterm_id: NontermId(
+                4,
+            ),
+            action: EmptyOption,
+            prec: None,
+            assoc: None,
+            symbols: [],
+        },
+        Production {
+            nonterm_id: NontermId(
+                4,
+            ),
+            action: NonemptyOption,
+            prec: None,
+            assoc: None,
+            symbols: [
+                Nonterm(
+                    NontermId(
+                        2,
+                    ),
+                ),
+            ],
+        },
+        Production {
+            nonterm_id: NontermId(
+                5,
+            ),
+            action: None,
+            prec: None,
+            assoc: None,
+            symbols: [
+                Nonterm(
+                    NontermId(
+                        1,
+                    ),
+                ),
+            ],
+        },
+        Production {
+            nonterm_id: NontermId(
+                5,
+            ),
+            action: None,
+            prec: None,
+            assoc: None,
+            symbols: [
+                Term(
+                    TermId(
+                        1,
+                    ),
+                ),
+            ],
+        },
+        Production {
+            nonterm_id: NontermId(
+                6,
+            ),
+            action: None,
+            prec: None,
+            assoc: None,
+            symbols: [
+                Term(
+                    TermId(
+                        0,
+                    ),
+                ),
+                Nonterm(
+                    NontermId(
+                        4,
+                    ),
+                ),
+                Nonterm(
+                    NontermId(
+                        5,
+                    ),
+                ),
+            ],
+        },
+        Production {
+            nonterm_id: NontermId(
+                3,
+            ),
+            action: StartMany,
+            prec: None,
+            assoc: None,
+            symbols: [],
+        },
+        Production {
+            nonterm_id: NontermId(
+                3,
+            ),
+            action: ContinueMany,
+            prec: None,
+            assoc: None,
+            symbols: [
+                Nonterm(
+                    NontermId(
+                        3,
+                    ),
+                ),
+                Nonterm(
+                    NontermId(
+                        6,
+                    ),
+                ),
+            ],
+        },
+        Production {
+            nonterm_id: NontermId(
+                7,
+            ),
+            action: EmptyOption,
+            prec: None,
+            assoc: None,
+            symbols: [],
+        },
+        Production {
+            nonterm_id: NontermId(
+                7,
+            ),
+            action: NonemptyOption,
+            prec: None,
+            assoc: None,
+            symbols: [
+                Nonterm(
+                    NontermId(
+                        0,
+                    ),
+                ),
+                Term(
+                    TermId(
+                        0,
+                    ),
+                ),
+            ],
+        },
+        Production {
+            nonterm_id: NontermId(
+                0,
+            ),
+            action: None,
+            prec: None,
+            assoc: None,
+            symbols: [
+                Nonterm(
+                    NontermId(
+                        3,
+                    ),
+                ),
+                Nonterm(
+                    NontermId(
+                        7,
+                    ),
+                ),
+            ],
+        },
+        Production {
+            nonterm_id: NontermId(
+                8,
+            ),
+            action: None,
+            prec: None,
+            assoc: None,
+            symbols: [
+                Term(
+                    TermId(
+                        2,
+                    ),
+                ),
+            ],
+        },
+        Production {
+            nonterm_id: NontermId(
+                8,
+            ),
+            action: None,
+            prec: None,
+            assoc: None,
+            symbols: [
+                Term(
+                    TermId(
+                        3,
+                    ),
+                ),
+                Nonterm(
+                    NontermId(
+                        1,
+                    ),
+                ),
+            ],
+        },
+        Production {
+            nonterm_id: NontermId(
+                1,
+            ),
+            action: StartMany1,
+            prec: None,
+            assoc: None,
+            symbols: [
+                Nonterm(
+                    NontermId(
+                        8,
+                    ),
+                ),
+            ],
+        },
+        Production {
+            nonterm_id: NontermId(
+                1,
+            ),
+            action: ContinueMany1,
+            prec: None,
+            assoc: None,
+            symbols: [
+                Nonterm(
+                    NontermId(
+                        1,
+                    ),
+                ),
+                Nonterm(
+                    NontermId(
+                        8,
+                    ),
+                ),
+            ],
+        },
+        Production {
+            nonterm_id: NontermId(
+                2,
+            ),
+            action: None,
+            prec: None,
+            assoc: None,
+            symbols: [
+                Nonterm(
+                    NontermId(
+                        1,
+                    ),
+                ),
+            ],
+        },
+        Production {
+            nonterm_id: NontermId(
+                2,
+            ),
+            action: None,
+            prec: None,
+            assoc: None,
+            symbols: [
+                Term(
+                    TermId(
+                        1,
+                    ),
+                ),
             ],
         },
     ],

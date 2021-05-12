@@ -120,7 +120,7 @@ impl Bnf {
         rules
       });
 
-    let mut starts = start_nts.into_iter()
+    let starts = start_nts.into_iter()
       .map(|nt|
         (nt.to_owned(), NontermId(rules.get_index_of(nt).unwrap() as u32)))
       .collect();
@@ -214,11 +214,11 @@ fn gen_nonterm(
         name: name.clone(),
         prod_range: prod_ix..prod_ix + 1,
       };
-      insert_nonterm(nonterms, symbols, name, nonterm)
+      insert_nonterm(nonterms, prods, symbols, name, nonterm)
     }
     RuleInner::Or(rules) => {
       let name = name.into();
-      let rule_prods = rules.into_iter()
+      let mut rule_prods = rules.into_iter()
         .map(|rule| gen_prod(nonterms, prods, symbols, ProdAction::None, rule))
         .collect::<Vec<_>>();
       let prod_range = prods.len()..prods.len() + rule_prods.len();
@@ -227,37 +227,42 @@ fn gen_nonterm(
         name: name.clone(),
         prod_range,
       };
-      insert_nonterm(nonterms, symbols, name, nonterm)
+      insert_nonterm(nonterms, prods, symbols, name, nonterm)
     }
     RuleInner::Many(box RuleRep { rule }) => {
-      gen_rep_nonterm(nonterms, symbols, id, name, |nonterms, symbols, id| {
-        let sym = gen_sym(nonterms, symbols, rule);
-        let prods = &mut nonterms[id.0 as usize].prods;
+      gen_rep_nonterm(nonterms, symbols, name, |nonterms, symbols, id| {
+        let subrule_sym = gen_sym(nonterms, prods, symbols, rule);
+        let prod_start_ix = prods.len();
 
         // rule* -> ε
         prods.push(Production {
+          nonterm_id: id,
           action: ProdAction::StartMany,
           ..Default::default()
         });
 
         // rule* -> rule* rule
         prods.push(Production {
+          nonterm_id: id,
           action: ProdAction::ContinueMany,
           symbols: vec![
             Symbol::Nonterm(id),
-            sym,
+            subrule_sym
           ],
           ..Default::default()
         });
+
+        prod_start_ix .. prod_start_ix + 2
       })
     }
     RuleInner::Many1(box RuleRep { rule }) => {
-      gen_rep_nonterm(nonterms, symbols, id, name, |nonterms, symbols, id| {
-        let sym = gen_sym(nonterms, symbols, rule);
-        let prods = &mut nonterms[id.0 as usize].prods;
+      gen_rep_nonterm(nonterms, symbols, name, |nonterms, symbols, id| {
+        let sym = gen_sym(nonterms, prods, symbols, rule);
+        let prod_start_ix = prods.len();
 
         // rule+ -> rule
         prods.push(Production {
+          nonterm_id: id,
           action: ProdAction::StartMany1,
           symbols: vec![sym],
           ..Default::default()
@@ -265,6 +270,7 @@ fn gen_nonterm(
 
         // rule+ -> rule+ rule
         prods.push(Production {
+          nonterm_id: id,
           action: ProdAction::ContinueMany1,
           symbols: vec![
             Symbol::Nonterm(id),
@@ -272,52 +278,66 @@ fn gen_nonterm(
           ],
           ..Default::default()
         });
+
+        prod_start_ix .. prod_start_ix + 2
       })
     }
     RuleInner::Option(box RuleRep { rule }) => {
-      gen_rep_nonterm(nonterms, symbols, id, name, |nonterms, symbols, id| {
-        let prod = gen_prod(nonterms, symbols, ProdAction::NonemptyOption, rule);
-        let prods = &mut nonterms[id.0 as usize].prods;
+      gen_rep_nonterm(nonterms, symbols, name, |nonterms, symbols, id| {
+        let mut prod = gen_prod(nonterms, prods, symbols,
+          ProdAction::NonemptyOption, rule);
+        let prod_start_ix = prods.len();
 
         // rule? -> ε
         prods.push(Production {
+          nonterm_id: id,
           action: ProdAction::EmptyOption,
           ..Default::default()
         });
 
         // rule? -> rule
+        prod.nonterm_id = id;
         prods.push(prod);
+
+        prod_start_ix .. prod_start_ix + 2
       })
     }
     RuleInner::SepBy(box RuleSepBy { sep, rule }) => {
       let name = name.into();
+      
+      // sepBy(sep, rule) -> sepBy1(sep, rule)
+      let sep_by1 = gen_prod(
+        nonterms, prods, symbols,
+        ProdAction::NonemptySepBy,
+        RuleInner::SepBy1(box RuleSepBy {
+          sep,
+          rule,
+        }));
+
       let nonterm = Nonterm {
         name: name.clone(),
-        prods: vec![
-          // sepBy(sep, rule) -> ε
-          Production {
-            action: ProdAction::EmptySepBy,
-            ..Default::default()
-          },
-
-          // sepBy(sep, rule) -> sepBy1(sep, rule)
-          gen_prod(nonterms, symbols, ProdAction::NonemptySepBy,
-            RuleInner::SepBy1(box RuleSepBy {
-              sep,
-              rule,
-            }))
-        ],
+        prod_range: prods.len() .. prods.len() + 2,
       };
-      insert_nonterm(nonterms, symbols, name, nonterm)
+
+      // sepBy(sep, rule) -> ε
+      prods.push(Production {
+        action: ProdAction::EmptySepBy,
+        ..Default::default()
+      });
+
+      prods.push(sep_by1);
+
+      insert_nonterm(nonterms, prods, symbols, name, nonterm)
     }
     RuleInner::SepBy1(box RuleSepBy { sep, rule }) => {
-      gen_rep_nonterm(nonterms, symbols, id, name, |nonterms, symbols, id| {
-        let sep_sym = gen_sym(nonterms, symbols, sep);
-        let sym = gen_sym(nonterms, symbols, rule);
-        let prods = &mut nonterms[id.0 as usize].prods;
+      gen_rep_nonterm(nonterms, symbols, name, |nonterms, symbols, id| {
+        let sep_sym = gen_sym(nonterms, prods, symbols, sep);
+        let sym = gen_sym(nonterms, prods, symbols, rule);
+        let prods_start_ix = prods.len();
 
         // sepBy1(sep, rule) -> rule
         prods.push(Production {
+          nonterm_id: id,
           action: ProdAction::StartSepBy1,
           symbols: vec![sym],
           ..Default::default()
@@ -325,6 +345,7 @@ fn gen_nonterm(
 
         // sepBy1(sep, rule) -> sepBy1(sep, rule) sep rule
         prods.push(Production {
+          nonterm_id: id,
           action: ProdAction::ContinueSepBy1,
           symbols: vec![
             Symbol::Nonterm(id),
@@ -333,13 +354,15 @@ fn gen_nonterm(
           ],
           ..Default::default()
         });
+
+        prods_start_ix .. prods_start_ix + 2
       })
     }
     RuleInner::Prec(box RulePrec { prec, assoc, rule }) => {
-      let nonterm_id = gen_nonterm(nonterms, symbols, id, name, rule);
-      for prod in &mut nonterms[nonterm_id.0 as usize].prods {
-        prod.prec = Some(prec);
-        prod.assoc = assoc;
+      let nonterm_id = gen_nonterm(nonterms, prods, symbols, name, rule);
+      for prod_ix in &mut nonterms[nonterm_id.0 as usize].prod_range {
+        prods[prod_ix].prec = Some(prec);
+        prods[prod_ix].assoc = assoc;
       }
       nonterm_id
     }
@@ -348,16 +371,23 @@ fn gen_nonterm(
 
 fn insert_nonterm(
   nonterms: &mut Vec<Nonterm>,
+  prods: &mut [Production],
   symbols: &mut HashMap<String, Symbol>,
   name: String,
   nonterm: Nonterm,
 ) -> NontermId {
   if let Some(Symbol::Nonterm(id)) = symbols.get(&name) {
+    for prod_ix in nonterm.prod_range.clone() {
+      prods[prod_ix].nonterm_id = *id;
+    }
     nonterms[id.0 as usize] = nonterm;
     *id
   } else {
     let id = NontermId(nonterms.len() as u32);
     symbols.insert(name, Symbol::Nonterm(id));
+    for prod_ix in nonterm.prod_range.clone() {
+      prods[prod_ix].nonterm_id = id;
+    }
     nonterms.push(nonterm);
     id
   }
@@ -374,21 +404,20 @@ where
     &mut Vec<Nonterm>,
     &mut HashMap<String, Symbol>,
     NontermId,
-  )
+  ) -> Range<usize>
 {
   let name = name.into();
-  let id = if let Some(id) = id {
-    id
+  let id = if let Some(Symbol::Nonterm(id)) = symbols.get(&name) {
+    *id
   } else {
     let id = NontermId(nonterms.len() as u32);
+    symbols.insert(name.clone(), Symbol::Nonterm(id));
     nonterms.push(Nonterm::default());
     id
   };
 
-  symbols.insert(name.clone(), Symbol::Nonterm(id));
-
   nonterms[id.0 as usize].name = name;
-  f(nonterms, symbols, id);
+  nonterms[id.0 as usize].prod_range = f(nonterms, symbols, id);
 
   id
 }
@@ -405,13 +434,13 @@ fn gen_prod(
       Production {
         action,
         symbols: rules.into_iter()
-          .map(|rule| gen_sym(nonterms, symbols, rule))
+          .map(|rule| gen_sym(nonterms, prods, symbols, rule))
           .collect(),
         ..Default::default()
       }
     }
     RuleInner::Prec(box RulePrec { prec, assoc, rule }) => {
-      let mut prod = gen_prod(nonterms, symbols, action, rule);
+      let mut prod = gen_prod(nonterms, prods, symbols, action, rule);
       prod.prec = Some(prec);
       prod.assoc = assoc;
       prod
@@ -419,7 +448,7 @@ fn gen_prod(
     _ => {
       Production {
         action,
-        symbols: vec![gen_sym(nonterms, symbols, rule)],
+        symbols: vec![gen_sym(nonterms, prods, symbols, rule)],
         ..Default::default()
       }
     }
@@ -428,6 +457,7 @@ fn gen_prod(
 
 fn gen_sym(
   nonterms: &mut Vec<Nonterm>,
+  prods: &mut Vec<Production>,
   symbols: &mut HashMap<String, Symbol>,
   rule: RuleInner,
 ) -> Symbol {
@@ -439,21 +469,21 @@ fn gen_sym(
       symbols[&sym]
     },
     RuleInner::Prec(box RulePrec { prec, assoc, rule }) => {
-      let id = match gen_sym(nonterms, symbols, rule.clone()) {
+      let id = match gen_sym(nonterms, prods, symbols, rule.clone()) {
         Symbol::Term(_) => {
-          gen_nonterm(nonterms, symbols, None, rule.name(), rule)
+          gen_nonterm(nonterms, prods, symbols, rule.name(), rule)
         }
         Symbol::Nonterm(id) => id,
       };
-      for prod in &mut nonterms[id.0 as usize].prods {
-        prod.prec = Some(prec);
-        prod.assoc = assoc;
+      for prod_ix in &mut nonterms[id.0 as usize].prod_range {
+        prods[prod_ix].prec = Some(prec);
+        prods[prod_ix].assoc = assoc;
       }
       Symbol::Nonterm(id)
     }
     _ => {
       let name = rule.name();
-      Symbol::Nonterm(gen_nonterm(nonterms, symbols, None, name, rule))
+      Symbol::Nonterm(gen_nonterm(nonterms, prods, symbols, name, rule))
     }
   }
 }

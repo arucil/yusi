@@ -10,13 +10,13 @@ pub(super) struct States {
 }
 
 pub(crate) struct Lr0Item {
-  pub(crate) nonterm: NontermId,
-  pub(crate) prod_ix: u16,
+  pub(crate) prod_ix: u32,
+  pub(crate) dot: u16,
 }
 
 pub(crate) struct Lalr1Item {
-  pub(crate) nonterm: NontermId,
-  pub(crate) prod_ix: u16,
+  pub(crate) prod_ix: u32,
+  pub(crate) dot: u16,
   pub(crate) lookaheads: BitSet,
 }
 

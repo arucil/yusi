@@ -96,9 +96,66 @@ mod tests {
     "#)
   }
 
+  fn ll_expr() -> Bnf {
+    Bnf::parse(r#"
+      E -> T E'
+      E' -> + T E'
+      E' ->
+      T -> F T'
+      T' -> * F T'
+      T' ->
+      F -> num
+      F -> ( E )
+    "#)
+  }
+
   #[test]
   fn simple_nullable() {
     let nullable = gen_nullable(&simple());
     assert_eq!(nullable, vec![false, true, true]);
+  }
+
+  #[test]
+  fn ll_expr_nullable() {
+    let nullable = gen_nullable(&ll_expr());
+    assert_eq!(nullable, vec![false, true, false, true, false]);
+  }
+
+  #[test]
+  fn simple_first() {
+    let bnf = simple();
+    let nullable = gen_nullable(&bnf);
+    let first = gen_first(&bnf, &nullable)
+      .into_iter()
+      .map(|set|
+        set.iter().map(|t| bnf.tokens.get_index(t).unwrap().0)
+          .collect::<Vec<_>>())
+      .collect::<Vec<_>>();
+    assert_eq!(first,
+      vec![
+        vec!["d", "c", "a"],
+        vec!["c"],
+        vec!["c", "a"],
+      ]);
+  }
+
+  #[test]
+  fn ll_expr_first() {
+    let bnf = ll_expr();
+    let nullable = gen_nullable(&bnf);
+    let first = gen_first(&bnf, &nullable)
+      .into_iter()
+      .map(|set|
+        set.iter().map(|t| bnf.tokens.get_index(t).unwrap().0)
+          .collect::<Vec<_>>())
+      .collect::<Vec<_>>();
+    assert_eq!(first,
+      vec![
+        vec!["num", "("],
+        vec!["+"],
+        vec!["num", "("],
+        vec!["*"],
+        vec!["num", "("]
+      ]);
   }
 }
